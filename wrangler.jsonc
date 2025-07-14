@@ -22,6 +22,9 @@
 			}
 		]
 	},
+	"vars": {
+		"STRAPI_URL": "https://timely-benefit-e63d540317.strapiapp.com"
+	},
 	"observability": {
 		"enabled": true
 	}

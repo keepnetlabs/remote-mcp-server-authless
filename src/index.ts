@@ -2,59 +2,162 @@ import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-// Define our MCP agent with tools
+// Define our MCP agent with tools for Articles
 export class MyMCP extends McpAgent {
 	server = new McpServer({
-		name: "Authless Calculator",
+		name: "Articles MCP Server",
 		version: "1.0.0",
 	});
 
-	async init() {
-		// Simple addition tool
-		this.server.tool(
-			"add",
-			{ a: z.number(), b: z.number() },
-			async ({ a, b }) => ({
-				content: [{ type: "text", text: String(a + b) }],
-			})
-		);
+	private env?: Env;
 
-		// Calculator tool with multiple operations
+	async init() {
+		// Article Tools - Get all articles
 		this.server.tool(
-			"calculate",
+			"get_all_articles",
 			{
-				operation: z.enum(["add", "subtract", "multiply", "divide"]),
-				a: z.number(),
-				b: z.number(),
+				limit: z.number().optional().default(1000),
+				category: z.string().optional(),
 			},
-			async ({ operation, a, b }) => {
-				let result: number;
-				switch (operation) {
-					case "add":
-						result = a + b;
-						break;
-					case "subtract":
-						result = a - b;
-						break;
-					case "multiply":
-						result = a * b;
-						break;
-					case "divide":
-						if (b === 0)
-							return {
-								content: [
-									{
-										type: "text",
-										text: "Error: Cannot divide by zero",
-									},
-								],
-							};
-						result = a / b;
-						break;
+			async ({ limit = 1000, category }: { limit?: number; category?: string }) => {
+				try {
+					const response = await this.callStrapiAPI("get_all_articles", { limit, category });
+					return {
+						content: [{
+							type: "text",
+							text: JSON.stringify(response, null, 2)
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `Error fetching articles: ${error instanceof Error ? error.message : String(error)}`
+						}]
+					};
 				}
-				return { content: [{ type: "text", text: String(result) }] };
 			}
 		);
+
+		// Article Tools - Search articles
+		this.server.tool(
+			"search_articles",
+			{
+				query: z.string(),
+				limit: z.number().optional().default(20),
+			},
+			async ({ query, limit = 20 }: { query: string; limit?: number }) => {
+				try {
+					const response = await this.callStrapiAPI("search_articles", { query, limit });
+					return {
+						content: [{
+							type: "text",
+							text: JSON.stringify(response, null, 2)
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `Error searching articles: ${error instanceof Error ? error.message : String(error)}`
+						}]
+					};
+				}
+			}
+		);
+
+		// Article Tools - Get article by ID
+		this.server.tool(
+			"get_article_by_id",
+			{
+				id: z.number(),
+			},
+			async ({ id }: { id: number }) => {
+				try {
+					const response = await this.callStrapiAPI("get_article_by_id", { id });
+					return {
+						content: [{
+							type: "text",
+							text: JSON.stringify(response, null, 2)
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `Error fetching article: ${error instanceof Error ? error.message : String(error)}`
+						}]
+					};
+				}
+			}
+		);
+
+		// Article Tools - Get article categories
+		this.server.tool(
+			"get_article_categories",
+			{},
+			async () => {
+				try {
+					const response = await this.callStrapiAPI("get_article_categories", {});
+					return {
+						content: [{
+							type: "text",
+							text: JSON.stringify(response, null, 2)
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `Error fetching categories: ${error instanceof Error ? error.message : String(error)}`
+						}]
+					};
+				}
+			}
+		);
+	}
+
+	// Set environment variables
+	setEnv(env: Env) {
+		this.env = env;
+	}
+
+	// Helper method to call Strapi API
+	private async callStrapiAPI(toolName: string, args: any) {
+		const strapiUrl = this.env?.STRAPI_URL || "https://timely-benefit-e63d540317.strapiapp.com";
+		const apiUrl = `${strapiUrl}/api/articles-mcp/mcp/tools/call`;
+
+		const response = await fetch(apiUrl, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				name: toolName,
+				arguments: args,
+			}),
+		});
+
+		if (!response.ok) {
+			throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+		}
+
+		const data: any = await response.json();
+
+		if (data.error) {
+			throw new Error(data.error.message);
+		}
+
+		// Parse the content if it's a string
+		if (data.content && data.content[0] && data.content[0].text) {
+			try {
+				return JSON.parse(data.content[0].text);
+			} catch {
+				return data.content[0].text;
+			}
+		}
+
+		return data;
 	}
 }
 
