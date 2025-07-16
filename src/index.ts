@@ -18,56 +18,13 @@ export class MyMCP extends McpAgent {
 			{
 				query: z.string(),
 			},
-			async ({ query }: { query: string }) => {
+			async ({ query, limit = 20 }: { query: string; limit?: number }) => {
 				try {
-					let response;
-
-					// Check for different types of queries
-					const lowerQuery = query.toLowerCase();
-
-					// Get all articles
-					const isGetAllQuery = !query ||
-						query.trim() === "" ||
-						query.trim() === "*" ||
-						lowerQuery.includes("all") ||
-						lowerQuery.includes("everything") ||
-						lowerQuery.includes("list");
-
-					// Get latest/recent articles
-					const isLatestQuery = lowerQuery.includes("latest") ||
-						lowerQuery.includes("recent") ||
-						lowerQuery.includes("newest") ||
-						lowerQuery.includes("last") ||
-						lowerQuery.includes("son") ||
-						lowerQuery.includes("yeni");
-
-					if (isGetAllQuery) {
-						response = await this.callStrapiAPI("get_all_articles", { limit: 100 });
-					} else if (isLatestQuery) {
-						// Extract number if mentioned (e.g., "last 5", "son 2")
-						const numberMatch = query.match(/(\d+)/);
-						const limit = numberMatch ? parseInt(numberMatch[1]) : 10;
-
-						response = await this.callStrapiAPI("get_all_articles", { limit });
-						// Sort by date if available (most recent first)
-						if (Array.isArray(response)) {
-							response = response.sort((a: any, b: any) => {
-								const dateA = new Date(a.publishedAt || a.created_at || a.updatedAt || 0);
-								const dateB = new Date(b.publishedAt || b.created_at || b.updatedAt || 0);
-								return dateB.getTime() - dateA.getTime();
-							});
-						}
-					} else {
-						response = await this.callStrapiAPI("search_articles", { query, limit: 50 });
-					}
-
-					// Transform to ChatGPT deep research format
-					const searchResults = this.transformSearchResults(response);
-
+					const response = await this.callStrapiAPI("search_articles", { query, limit });
 					return {
 						content: [{
 							type: "text",
-							text: JSON.stringify(searchResults, null, 2)
+							text: JSON.stringify(response, null, 2)
 						}]
 					};
 				} catch (error) {
@@ -87,24 +44,20 @@ export class MyMCP extends McpAgent {
 			{
 				id: z.string(),
 			},
-			async ({ id }: { id: string }) => {
+			async ({ limit = 100, category }: { limit?: number; category?: string }) => {
 				try {
-					const response = await this.callStrapiAPI("get_article_by_id", { id: parseInt(id) });
-
-					// Transform to ChatGPT deep research format
-					const fetchResult = this.transformFetchResult(response);
-
+					const response = await this.callStrapiAPI("get_all_articles", { limit, category });
 					return {
 						content: [{
 							type: "text",
-							text: JSON.stringify(fetchResult, null, 2)
+							text: JSON.stringify(response, null, 2)
 						}]
 					};
 				} catch (error) {
 					return {
 						content: [{
 							type: "text",
-							text: `Error fetching article: ${error instanceof Error ? error.message : String(error)}`
+							text: `Error fetching articles: ${error instanceof Error ? error.message : String(error)}`
 						}]
 					};
 				}
