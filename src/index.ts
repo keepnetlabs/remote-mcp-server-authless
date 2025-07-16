@@ -22,7 +22,9 @@ export class MyMCP extends McpAgent {
 			async ({ query, limit = 20 }: { query: string; limit?: number }) => {
 				try {
 					const raw = await this.callStrapiAPI("search_articles", { query, limit });
-					const results = Array.isArray(raw) ? this.transformSearchResults(raw) : [];
+					// Strapi response: { query, articles, total, mcpInfo }
+					const articles = raw?.articles || [];
+					const results = Array.isArray(articles) ? this.transformSearchResults(articles) : [];
 					return {
 						content: results.map(item => ({
 							type: "text",
@@ -50,7 +52,9 @@ export class MyMCP extends McpAgent {
 			async ({ limit = 10, category }: { limit?: number; category?: string }) => {
 				try {
 					const raw = await this.callStrapiAPI("get_all_articles", { limit, category });
-					const arr = Array.isArray(raw) ? raw : [raw];
+					// Strapi response: { articles, total, metadata, mcpInfo }
+					const articles = raw?.articles || [];
+					const arr = Array.isArray(articles) ? articles : [articles];
 					const items = arr.map(article => this.transformFetchResult(article));
 					return {
 						content: items.map(item => ({
@@ -77,9 +81,18 @@ export class MyMCP extends McpAgent {
 		}
 		return searchResponse.map((article: any) => ({
 			id: article.id?.toString() || Math.random().toString(),
-			title: article.title || article.name || "Untitled Article",
-			text: this.createSnippet(article.content || article.description || article.excerpt || "No content available"),
-			url: article.url || article.link || `https://timely-benefit-e63d540317.strapiapp.com/articles/${article.id}`,
+			title: article.title || "Untitled Article",
+			// Search için summary/excerpt kullan
+			text: this.createSnippet(
+				article.summary ||
+				article.excerpt ||
+				article.description ||
+				article.fullContent ||
+				"No content available"
+			),
+			url: article.url?.startsWith('http')
+				? article.url
+				: `https://timely-benefit-e63d540317.strapiapp.com${article.url || `/blog/${article.articleId || article.id}`}`,
 		}));
 	}
 
@@ -88,16 +101,22 @@ export class MyMCP extends McpAgent {
 		const article = articleResponse;
 		return {
 			id: article.id?.toString() || "unknown",
-			title: article.title || article.name || "Untitled Article",
-			text: article.content || article.description || article.body || "No content available",
-			url: article.url || article.link || `https://timely-benefit-e63d540317.strapiapp.com/articles/${article.id}`,
+			title: article.title || "Untitled Article",
+			// Fetch için full content kullan
+			text: article.fullContent || article.description || article.summary || "No content available",
+			url: article.url?.startsWith('http')
+				? article.url
+				: `https://timely-benefit-e63d540317.strapiapp.com${article.url || `/blog/${article.articleId || article.id}`}`,
 			metadata: {
 				author: article.author,
-				publishedAt: article.publishedAt || article.created_at,
+				publishedAt: article.publishedAt,
+				updatedAt: article.updatedAt,
 				category: article.category,
 				tags: article.tags,
-				updatedAt: article.updatedAt || article.updated_at,
-				source: "Strapi CMS",
+				source: "Keepnet Labs Blog",
+				readingTime: article.readingTime,
+				wordCount: article.wordCount,
+				seo: article.seo,
 				...article.metadata,
 			},
 		};
