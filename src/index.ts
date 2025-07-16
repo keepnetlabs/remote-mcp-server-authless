@@ -44,7 +44,7 @@ export class MyMCP extends McpAgent {
 			{
 				id: z.string(),
 			},
-			async ({ limit = 100, category }: { limit?: number; category?: string }) => {
+			async ({ limit = 10, category }: { limit?: number; category?: string }) => {
 				try {
 					const response = await this.callStrapiAPI("get_all_articles", { limit, category });
 					return {
