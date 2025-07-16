@@ -12,7 +12,7 @@ export class MyMCP extends McpAgent {
 	private env?: Env;
 
 	async init() {
-		// ChatGPT Deep Research - Search tool
+		// ChatGPT Deep Research - Enhanced Search tool
 		this.server.tool(
 			"search",
 			{
@@ -20,7 +20,46 @@ export class MyMCP extends McpAgent {
 			},
 			async ({ query }: { query: string }) => {
 				try {
-					const response = await this.callStrapiAPI("search_articles", { query, limit: 20 });
+					let response;
+
+					// Check for different types of queries
+					const lowerQuery = query.toLowerCase();
+
+					// Get all articles
+					const isGetAllQuery = !query ||
+						query.trim() === "" ||
+						query.trim() === "*" ||
+						lowerQuery.includes("all") ||
+						lowerQuery.includes("everything") ||
+						lowerQuery.includes("list");
+
+					// Get latest/recent articles
+					const isLatestQuery = lowerQuery.includes("latest") ||
+						lowerQuery.includes("recent") ||
+						lowerQuery.includes("newest") ||
+						lowerQuery.includes("last") ||
+						lowerQuery.includes("son") ||
+						lowerQuery.includes("yeni");
+
+					if (isGetAllQuery) {
+						response = await this.callStrapiAPI("get_all_articles", { limit: 100 });
+					} else if (isLatestQuery) {
+						// Extract number if mentioned (e.g., "last 5", "son 2")
+						const numberMatch = query.match(/(\d+)/);
+						const limit = numberMatch ? parseInt(numberMatch[1]) : 10;
+
+						response = await this.callStrapiAPI("get_all_articles", { limit });
+						// Sort by date if available (most recent first)
+						if (Array.isArray(response)) {
+							response = response.sort((a: any, b: any) => {
+								const dateA = new Date(a.publishedAt || a.created_at || a.updatedAt || 0);
+								const dateB = new Date(b.publishedAt || b.created_at || b.updatedAt || 0);
+								return dateB.getTime() - dateA.getTime();
+							});
+						}
+					} else {
+						response = await this.callStrapiAPI("search_articles", { query, limit: 50 });
+					}
 
 					// Transform to ChatGPT deep research format
 					const searchResults = this.transformSearchResults(response);
@@ -109,7 +148,7 @@ export class MyMCP extends McpAgent {
 	}
 
 	// Create a snippet from full text (for search results)
-	private createSnippet(text: string, maxLength: number = 200): string {
+	private createSnippet(text: string, maxLength: number = 512): string {
 		if (!text || text.length <= maxLength) {
 			return text;
 		}
