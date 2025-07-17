@@ -77,7 +77,11 @@ export class MyMCP extends McpAgent {
 		return searchResponse.map((article: any, index: number) => {
 			// Handle both search results and latest articles
 			let textContent = "";
-			if (article.summary || article.excerpt) {
+			if(article.content){
+				textContent = article.content;
+			}
+
+			else if (article.summary || article.excerpt) {
 				// From search_articles API
 				textContent = article.summary || article.excerpt || article.description || "No content available";
 			} else {
