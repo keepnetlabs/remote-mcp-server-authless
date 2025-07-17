@@ -70,7 +70,13 @@ export class MyMCP extends McpAgent {
 						throw new Error("Document not found");
 					}
 					const result = this.transformFetchResult(article);
-					return result;
+					return {
+						content: [
+						{
+							type: "text",
+							text: JSON.stringify(result, null, 2)
+						}
+					]};
 				} catch (error) {
 					throw error;
 				}
