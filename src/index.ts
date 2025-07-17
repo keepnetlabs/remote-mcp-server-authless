@@ -38,9 +38,19 @@ export class MyMCP extends McpAgent {
 
 					const results = Array.isArray(articles) ? this.transformSearchResults(articles) : [];
 
-					return { results };
+					return {
+						content: [{
+							type: "text",
+							text: JSON.stringify(results, null, 2)
+						}]
+					};
 				} catch (error) {
-					return { results: [] };
+					return {
+						content: [{
+							type: "text",
+							text: JSON.stringify({ results: [] }, null, 2)
+						}]
+					};
 				}
 			}
 		);
@@ -53,7 +63,7 @@ export class MyMCP extends McpAgent {
 			},
 			async ({ id }: { id: string }) => {
 				try {
-					const raw = await this.callStrapiAPI("get_article_by_id", { id: parseInt(id) });
+					const raw = await this.callStrapiAPI("get_article_by_id", { id });
 
 					const article = raw?.article;
 					if (!article) {
@@ -77,7 +87,7 @@ export class MyMCP extends McpAgent {
 		return searchResponse.map((article: any, index: number) => {
 			// Handle both search results and latest articles
 			let textContent = "";
-			if(article.content){
+			if (article.content) {
 				textContent = article.content;
 			}
 
