@@ -17,10 +17,10 @@ export class MyMCP extends McpAgent {
 			"search",
 			{
 				query: z.string().describe("Search query string"),
+				limit: z.number().describe("Limit of articles to return"),
 			},
-			async ({ query }: { query: string }) => {
+			async ({ query, limit = 20 }: { query: string, limit: number }) => {
 				try {
-					const limit = 20;
 
 					let raw;
 					// If query is "*", get latest articles instead of searching
@@ -33,31 +33,14 @@ export class MyMCP extends McpAgent {
 					const articles = raw?.articles || [];
 
 					if (articles.length === 0) {
-						return {
-							content: [{
-								type: "text",
-								text: JSON.stringify([], null, 2),
-							}],
-						};
+						return { results: [] };
 					}
 
 					const results = Array.isArray(articles) ? this.transformSearchResults(articles) : [];
 
-					// Return array directly for ChatGPT
-					return {
-						content: [{
-							type: "text",
-							text: JSON.stringify(results, null, 2),
-						}],
-					};
+					return { results };
 				} catch (error) {
-					// Return empty array on error for ChatGPT
-					return {
-						content: [{
-							type: "text",
-							text: JSON.stringify([], null, 2),
-						}],
-					};
+					return { results: [] };
 				}
 			}
 		);
@@ -76,18 +59,10 @@ export class MyMCP extends McpAgent {
 					if (!article) {
 						throw new Error("Document not found");
 					}
-
 					const result = this.transformFetchResult(article);
-
-					// Return single object for ChatGPT
-					return {
-						content: [{
-							type: "text",
-							text: JSON.stringify(result, null, 2),
-						}],
-					};
+					return result;
 				} catch (error) {
-					throw error; // Let ChatGPT handle the error
+					throw error;
 				}
 			}
 		);
@@ -114,7 +89,7 @@ export class MyMCP extends McpAgent {
 			const result = {
 				id: article.id?.toString() || Math.random().toString(),
 				title: article.title || "Untitled Article",
-				text: this.createSnippet(textContent),
+				text: textContent,
 				url: this.buildArticleUrl(article)
 			};
 
@@ -143,30 +118,13 @@ export class MyMCP extends McpAgent {
 		return result;
 	}
 
-	// Create a snippet from full text (for search results)
-	private createSnippet(text: string, maxLength: number = 512): string {
-		if (!text || text.length <= maxLength) {
-			return text;
-		}
-		const snippet = text.substring(0, maxLength);
-		const lastSpace = snippet.lastIndexOf(" ");
-		if (lastSpace > maxLength * 0.8) {
-			return snippet.substring(0, lastSpace) + "...";
-		}
-		return snippet + "...";
-	}
 
 	// Helper method to build article URL
 	private buildArticleUrl(article: any): string {
-		const baseUrl = this.env?.STRAPI_URL || "https://timely-benefit-e63d540317.strapiapp.com";
-
-		// API'den gelen URL'i kullan, yoksa ID ile oluştur
+		const baseUrl = "https://keepnetlabs.com";
 		if (article.url) {
-			// Relative URL'se absolute yap
 			return article.url.startsWith('http') ? article.url : `${baseUrl}${article.url}`;
 		}
-
-		// Fallback: ID ile URL oluştur
 		return `${baseUrl}/blog/${article.articleId || article.id}`;
 	}
 
